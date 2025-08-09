@@ -92,4 +92,7 @@ jspm_packages/
 # TernJS port file
 .tern-port
 
+# Project docs not tracked
+TODO.md
+
 

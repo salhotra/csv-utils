@@ -1,0 +1,21 @@
+{
+  "name": "@csv-utils/io-browser",
+  "version": "0.1.0",
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@csv-utils/core": "file:../core",
+    "papaparse": "^5.4.1"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/papaparse": "^5.3.16"
+  }
+}
