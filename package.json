@@ -1,0 +1,24 @@
+{
+  "name": "csv-utils",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no tests at root\"",
+    "build": "npm run -ws build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "typescript": "^5.9.2"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}

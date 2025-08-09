@@ -1,0 +1,22 @@
+{
+  "name": "@csv-utils/cli",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "csv-search": "bin/csv-search.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@csv-utils/io-node": "file:../../packages/io-node",
+    "csv-stringify": "^6.6.0"
+  },
+  "license": "MIT"
+}
+
+
