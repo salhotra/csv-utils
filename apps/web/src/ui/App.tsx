@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSnapshot } from "valtio";
 import { parseCsvFile } from "@csv-utils/io-browser";
 import type { UiRow, ColumnType } from "./types";
 import { DataTable } from "./components/DataTable";
@@ -9,6 +10,16 @@ import { ErrorModal } from "./components/ErrorModal";
 import { TypeReviewModal } from "./components/TypeReviewModal";
 import { useTypeProfiles } from "./hooks/useTypeProfiles";
 import { stampRow, inferColumnTypes, signatureOf } from "./utils/csv";
+import {
+  store,
+  setAppendMode as setAppendModeInStore,
+  addWarnings as addWarningsToStore,
+  replaceData as replaceDataInStore,
+  appendData as appendDataInStore,
+  removeRowsByIds,
+  type UploadedFile,
+} from "./store";
+import { FileSidebar } from "./components/FileSidebar";
 
 export function App(): JSX.Element {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -28,10 +39,11 @@ export function App(): JSX.Element {
       localStorage.setItem("theme", theme);
     } catch {}
   }, [theme]);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<UiRow[]>([]);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [appendMode, setAppendMode] = useState<"append" | "replace">("replace");
+  const snap = useSnapshot(store);
+  const headers = snap.headers;
+  const rows = snap.rows;
+  const warnings = snap.warnings;
+  const appendMode = snap.appendMode;
   const [searchText, setSearchText] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [columnsOpen, setColumnsOpen] = useState(false);
@@ -51,6 +63,7 @@ export function App(): JSX.Element {
     rows: UiRow[];
     warnings: string[];
     types: Record<string, ColumnType>;
+    uploadedFiles?: UploadedFile[];
   } | null>(null);
 
   // no-op here; persistence handled by hook
@@ -58,7 +71,7 @@ export function App(): JSX.Element {
   const filteredRows = useMemo(() => {
     if (!searchText.trim() || selectedColumns.length === 0) return rows;
     const needle = searchText.toLowerCase();
-    return rows.filter((r) =>
+    return rows.filter((r: UiRow) =>
       selectedColumns.some((c) => (r[c] ?? "").toLowerCase().includes(needle))
     );
   }, [rows, searchText, selectedColumns]);
@@ -118,30 +131,62 @@ export function App(): JSX.Element {
         });
         return;
       }
-      const nextRows: UiRow[] = valid.flatMap((p) => p.rows.map(stampRow));
-      const sig = signatureOf(h);
+      // Stamp rows and annotate with file provenance
+      const uploadedFiles: UploadedFile[] = [];
+      const allStampedRows: UiRow[] = [];
+      const sig = signatureOf(h as readonly string[]);
+      files.forEach((file, i) => {
+        const p = parsedAll[i];
+        if (!p || p.headers.length === 0) return;
+        const fileId =
+          (globalThis as any).crypto?.randomUUID?.() ??
+          `f_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const stamped = p.rows.map((row) => {
+          const baseRow: Record<string, string> = {
+            ...row,
+            __fileId: fileId,
+            __fileName: file.name,
+          };
+          const stampedRow = stampRow(baseRow);
+          return stampedRow;
+        });
+        allStampedRows.push(...stamped);
+        uploadedFiles.push({
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          lastModified: file.lastModified,
+          appendedAt: Date.now(),
+          headers: p.headers,
+          rowCount: p.rows.length,
+          skippedCount: p.skippedRows?.length ?? 0,
+          warnings: p.warnings ?? [],
+          schemaSignature: sig,
+          sampleRows: stamped.slice(0, 5),
+        });
+      });
       const known = typeProfiles[sig];
       if (known) {
         // Known schema: skip type review
-        setHeaders(h);
-        setRows(nextRows);
+        replaceDataInStore({ headers: h, rows: allStampedRows, uploadedFiles });
         setSelectedColumns(h);
-        setWarnings((w) => [...w, ...newWarnings]);
+        addWarningsToStore(newWarnings);
         setColumnTypes(known);
       } else {
-        const inferred = inferColumnTypes(h, nextRows);
+        const inferred = inferColumnTypes(h, allStampedRows);
         setStagedImport({
           headers: h,
-          rows: nextRows,
+          rows: allStampedRows,
           warnings: newWarnings,
           types: inferred,
+          uploadedFiles,
         });
       }
       return;
     }
 
     // append mode
-    const h = headers;
+    const h = headers as string[];
     const allMatchExisting = valid.every(
       (p: Parsed) =>
         p.headers.length === h.length &&
@@ -163,12 +208,42 @@ export function App(): JSX.Element {
       });
       return;
     }
-    const nextRows: UiRow[] = valid.flatMap((p: Parsed) =>
-      p.rows.map(stampRow)
-    );
+    // Append mode: annotate with file provenance
+    const uploadedFiles: UploadedFile[] = [];
+    const nextRows: UiRow[] = [];
+    files.forEach((file, i) => {
+      const p = parsedAll[i];
+      if (!p || p.headers.length === 0) return;
+      const fileId =
+        (globalThis as any).crypto?.randomUUID?.() ??
+        `f_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const stamped = p.rows.map((row) => {
+        const baseRow: Record<string, string> = {
+          ...row,
+          __fileId: fileId,
+          __fileName: file.name,
+        };
+        const stampedRow = stampRow(baseRow);
+        return stampedRow;
+      });
+      nextRows.push(...stamped);
+      uploadedFiles.push({
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        appendedAt: Date.now(),
+        headers: p.headers,
+        rowCount: p.rows.length,
+        skippedCount: p.skippedRows?.length ?? 0,
+        warnings: p.warnings ?? [],
+        schemaSignature: signatureOf(headers as readonly string[]),
+        sampleRows: stamped.slice(0, 5),
+      });
+    });
     // Columns match existing -> skip review and append directly
-    setRows((r) => [...r, ...nextRows]);
-    setWarnings((w) => [...w, ...newWarnings]);
+    appendDataInStore({ rows: nextRows, uploadedFiles });
+    addWarningsToStore(newWarnings);
   };
 
   // highlight matches in-cell
@@ -227,10 +302,10 @@ export function App(): JSX.Element {
       return needsQuotes ? `"${escaped}"` : escaped;
     };
     const lines: string[] = [];
-    lines.push(headers.map((h) => escapeCell(h)).join(","));
+    lines.push(headers.map((h: string) => escapeCell(h)).join(","));
     for (const row of filteredRows) {
       lines.push(
-        headers.map((h) => escapeCell(String(row[h] ?? ""))).join(",")
+        headers.map((h: string) => escapeCell(String(row[h] ?? ""))).join(",")
       );
     }
     const blob = new Blob([lines.join("\n")], {
@@ -256,15 +331,13 @@ export function App(): JSX.Element {
               setTheme((t) => (t === "dark" ? "light" : "dark"))
             }
             appendMode={appendMode}
-            setAppendMode={setAppendMode}
+            setAppendMode={setAppendModeInStore}
             onUpload={onUpload}
             onDownload={downloadCsv}
             canDownload={headers.length > 0}
             onDeleteSelected={() => {
               if (selectedRowIds.size === 0) return;
-              setRows((prev) =>
-                prev.filter((r) => !selectedRowIds.has(r._rid))
-              );
+              removeRowsByIds(selectedRowIds);
               setSelectedRowIds(new Set());
             }}
             canDelete={selectedRowIds.size > 0}
@@ -286,7 +359,7 @@ export function App(): JSX.Element {
                   setColumnsOpen={setColumnsOpen}
                   columnQuery={columnQuery}
                   setColumnQuery={setColumnQuery}
-                  onToggleColumn={(h, checked) =>
+                  onToggleColumn={(h: string, checked: boolean) =>
                     setSelectedColumns((cols) =>
                       checked
                         ? Array.from(new Set([...cols, h]))
@@ -301,22 +374,25 @@ export function App(): JSX.Element {
           </div>
         </div>
 
-        <DataTable
-          headers={headers}
-          rows={rows}
-          filteredRows={filteredRows}
-          selectedRowIds={selectedRowIds}
-          setSelectedRowIds={setSelectedRowIds}
-          highlight={(text, col) => highlight(text, col)}
-          columnTypes={columnTypes}
-          totalsByColumn={totalsByColumn}
-          numberFormatter={numberFormatter}
-        />
+        <div className="flex gap-4 px-6 flex-1 min-h-0">
+          <DataTable
+            headers={headers}
+            rows={rows}
+            filteredRows={filteredRows}
+            selectedRowIds={selectedRowIds}
+            setSelectedRowIds={setSelectedRowIds}
+            highlight={(text, col) => highlight(text, col)}
+            columnTypes={columnTypes}
+            totalsByColumn={totalsByColumn}
+            numberFormatter={numberFormatter}
+          />
+          <FileSidebar />
+        </div>
 
         {warnings.length > 0 && (
           <section className="card p-4 text-amber-700 dark:text-amber-300">
             <ul className="list-disc pl-5 space-y-1">
-              {warnings.map((w, i) => (
+              {warnings.map((w: string, i: number) => (
                 <li key={i}>{w}</li>
               ))}
             </ul>
@@ -345,18 +421,24 @@ export function App(): JSX.Element {
               if (!stagedImport) return;
               const sig = signatureOf(stagedImport.headers);
               if (appendMode === "replace" || headers.length === 0) {
-                setHeaders(stagedImport.headers);
-                setRows(stagedImport.rows);
-                setSelectedColumns(stagedImport.headers);
-                setWarnings((w) => [...w, ...stagedImport.warnings]);
+                replaceDataInStore({
+                  headers: stagedImport.headers,
+                  rows: stagedImport.rows,
+                  uploadedFiles: stagedImport.uploadedFiles ?? [],
+                });
+                setSelectedColumns([...stagedImport.headers]);
+                addWarningsToStore(stagedImport.warnings);
                 setColumnTypes(stagedImport.types);
                 setTypeProfiles((prev) => ({
                   ...prev,
                   [sig]: stagedImport.types,
                 }));
               } else {
-                setRows((r) => [...r, ...stagedImport.rows]);
-                setWarnings((w) => [...w, ...stagedImport.warnings]);
+                appendDataInStore({
+                  rows: stagedImport.rows,
+                  uploadedFiles: stagedImport.uploadedFiles ?? [],
+                });
+                addWarningsToStore(stagedImport.warnings);
                 setColumnTypes((prev) => ({ ...prev, ...stagedImport.types }));
                 setTypeProfiles((prev) => ({
                   ...prev,

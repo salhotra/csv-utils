@@ -45,7 +45,7 @@ export const inferColumnTypes = (
   return result;
 };
 
-export const signatureOf = (colHeaders: string[]): string =>
+export const signatureOf = (colHeaders: readonly string[]): string =>
   JSON.stringify(colHeaders);
 
 export const formatNumber = (n: number): string =>

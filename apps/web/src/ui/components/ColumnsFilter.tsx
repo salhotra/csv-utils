@@ -1,8 +1,8 @@
 import React from "react";
 
 type Props = {
-  headers: string[];
-  selectedColumns: string[];
+  headers: readonly string[];
+  selectedColumns: readonly string[];
   columnsOpen: boolean;
   setColumnsOpen: (v: boolean) => void;
   columnQuery: string;

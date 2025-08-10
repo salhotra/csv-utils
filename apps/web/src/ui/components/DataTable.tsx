@@ -2,9 +2,9 @@ import React from "react";
 import type { UiRow, ColumnType } from "../types";
 
 type Props = {
-  headers: string[];
-  rows: UiRow[];
-  filteredRows: UiRow[];
+  headers: readonly string[];
+  rows: readonly UiRow[];
+  filteredRows: readonly UiRow[];
   selectedRowIds: Set<string>;
   setSelectedRowIds: (next: Set<string>) => void;
   highlight: (text: string, col: string) => React.ReactNode;
@@ -25,7 +25,7 @@ export function DataTable({
   numberFormatter,
 }: Props): JSX.Element {
   return (
-    <section className="card p-0 flex-1 overflow-auto no-scrollbar mx-6">
+    <section className="card p-0 flex-1 min-h-0 overflow-auto no-scrollbar">
       {headers.length === 0 ? (
         <div className="p-6 text-white/60">Upload CSV files to begin.</div>
       ) : (
