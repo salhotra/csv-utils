@@ -230,8 +230,8 @@ export function App(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen p-0 flex flex-col">
-      <div className="w-full space-y-4 flex-1 flex flex-col min-h-0">
+    <div className="h-screen p-0 flex flex-col overflow-hidden">
+      <div className="w-full space-y-4 flex-1 flex flex-col min-h-0 pb-4">
         <div className="sticky top-0 z-20 bg-surface/80 backdrop-blur border-b border-white/5">
           <Toolbar
             appendMode={appendMode}

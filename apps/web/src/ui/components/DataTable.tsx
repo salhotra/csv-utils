@@ -25,13 +25,13 @@ export function DataTable({
   numberFormatter,
 }: Props): JSX.Element {
   return (
-    <section className="card p-0 flex-1 overflow-auto mx-6 mt-4">
+    <section className="card p-0 flex-1 overflow-auto no-scrollbar mx-6">
       {headers.length === 0 ? (
         <div className="p-6 text-white/60">Upload CSV files to begin.</div>
       ) : (
         <table className="table w-full">
-          <thead className="sticky top-0 bg-panel">
-            <tr>
+          <thead className="sticky top-0 bg-panel z-10">
+            <tr className="bg-white/5">
               <th className="th w-10">
                 <input
                   type="checkbox"
@@ -80,8 +80,14 @@ export function DataTable({
                 ))}
               </tr>
             ))}
+            {/* spacer so last row doesn't sit under the sticky footer */}
+            <tr aria-hidden="true">
+              <td className="p-0" colSpan={headers.length + 1}>
+                <div className="h-10" />
+              </td>
+            </tr>
           </tbody>
-          <tfoot>
+          <tfoot className="sticky bottom-0 bg-panel z-10">
             <tr className="bg-white/5">
               <td className="td font-semibold">Totals</td>
               {headers.map((h) => (

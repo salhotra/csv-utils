@@ -35,3 +35,12 @@ body {
 .chip {
   @apply inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10;
 }
+
+/* Hide scrollbars but keep scroll functionality */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
