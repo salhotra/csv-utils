@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSnapshot } from "valtio";
 import { parseCsvFile } from "@csv-utils/io-browser";
-import type { UiRow, ColumnType } from "./types";
+import type { UiRow, ColumnType, SchemaUnifierData } from "./types";
 import { DataTable } from "./components/DataTable";
 import { Toolbar } from "./components/Toolbar";
 import { SearchBar } from "./components/SearchBar";
 import { ColumnsFilter } from "./components/ColumnsFilter";
 import { ErrorModal } from "./components/ErrorModal";
 import { TypeReviewModal } from "./components/TypeReviewModal";
+import { SchemaUnifierModal } from "./components/SchemaUnifierModal";
 import { useTypeProfiles } from "./hooks/useTypeProfiles";
 import { stampRow, inferColumnTypes, signatureOf } from "./utils/csv";
 import {
@@ -65,6 +66,8 @@ export function App(): JSX.Element {
     types: Record<string, ColumnType>;
     uploadedFiles?: UploadedFile[];
   } | null>(null);
+  const [schemaUnifierData, setSchemaUnifierData] =
+    useState<SchemaUnifierData | null>(null);
 
   // no-op here; persistence handled by hook
 
@@ -193,18 +196,31 @@ export function App(): JSX.Element {
         p.headers.every((x: string, i: number) => x === h[i])
     );
     if (!allMatchExisting) {
-      const offending = valid.find(
-        (p) =>
-          !(
-            p.headers.length === h.length &&
-            p.headers.every((x, i) => x === h[i])
-          )
-      );
-      setErrorModal({
-        title: "Schema mismatch",
-        message: `Existing: ${h.join(", ")}\nGot: ${
-          offending?.headers.join(", ") ?? "(unknown)"
-        }`,
+      // Schema mismatch detected - open schema unifier
+      const newFiles = files
+        .map((file, i) => {
+          const p = parsedAll[i];
+          if (!p || p.headers.length === 0) return null;
+
+          return {
+            name: file.name,
+            headers: p.headers,
+            sampleRows: p.rows.slice(0, 5),
+            allRows: p.rows,
+            size: file.size,
+            lastModified: file.lastModified,
+            warnings: p.warnings ?? [],
+            skippedRows: p.skippedRows,
+          };
+        })
+        .filter(Boolean) as SchemaUnifierData["newFiles"];
+
+      setSchemaUnifierData({
+        existingHeaders: h,
+        newFiles,
+        mappings: {},
+        finalColumnOrder: [],
+        finalColumnTypes: {},
       });
       return;
     }
@@ -244,6 +260,91 @@ export function App(): JSX.Element {
     // Columns match existing -> skip review and append directly
     appendDataInStore({ rows: nextRows, uploadedFiles });
     addWarningsToStore(newWarnings);
+  };
+
+  // Schema unifier handlers
+  const handleSchemaUnifierConfirm = async (unifiedData: SchemaUnifierData) => {
+    setSchemaUnifierData(null);
+
+    // Get the cached file data from the unifier data
+    const newFiles = unifiedData.newFiles;
+    if (!newFiles.length) return;
+
+    // Create unified rows based on the mapping
+    const uploadedFiles: UploadedFile[] = [];
+    const nextRows: UiRow[] = [];
+    const finalHeaders = unifiedData.finalColumnOrder;
+
+    newFiles.forEach((fileData) => {
+      const fileId =
+        (globalThis as any).crypto?.randomUUID?.() ??
+        `f_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      // Map each row according to the schema unifier mappings
+      const mappedRows = fileData.allRows.map((row) => {
+        const unifiedRow: Record<string, string> = {};
+
+        // Initialize all final columns with empty strings
+        finalHeaders.forEach((header) => {
+          unifiedRow[header] = "";
+        });
+
+        // Map data based on the column mappings
+        Object.entries(unifiedData.mappings).forEach(
+          ([sourceColumn, mapping]) => {
+            if (row[sourceColumn] !== undefined) {
+              const targetColumn = mapping.targetColumn || sourceColumn;
+              unifiedRow[targetColumn] = row[sourceColumn];
+            }
+          }
+        );
+
+        // Add file metadata
+        unifiedRow.__fileId = fileId;
+        unifiedRow.__fileName = fileData.name;
+
+        return stampRow(unifiedRow);
+      });
+
+      nextRows.push(...mappedRows);
+      uploadedFiles.push({
+        id: fileId,
+        name: fileData.name,
+        size: fileData.size,
+        lastModified: fileData.lastModified,
+        appendedAt: Date.now(),
+        headers: finalHeaders,
+        rowCount: mappedRows.length,
+        skippedCount: fileData.skippedRows?.length ?? 0,
+        warnings: fileData.warnings,
+        schemaSignature: signatureOf(finalHeaders),
+        sampleRows: mappedRows.slice(0, 5),
+      });
+    });
+
+    // Update the existing data with empty strings for new columns
+    const existingRowsWithNewColumns = rows.map((row) => {
+      const updatedRow = { ...row };
+      finalHeaders.forEach((header) => {
+        if (!(header in updatedRow)) {
+          updatedRow[header] = "";
+        }
+      });
+      return updatedRow;
+    });
+
+    // Update store with unified schema
+    replaceDataInStore({
+      headers: finalHeaders,
+      rows: [...existingRowsWithNewColumns, ...nextRows],
+      uploadedFiles: [...store.uploadedFiles, ...uploadedFiles],
+    });
+    setSelectedColumns(finalHeaders);
+    setColumnTypes(unifiedData.finalColumnTypes);
+  };
+
+  const handleSchemaUnifierCancel = () => {
+    setSchemaUnifierData(null);
   };
 
   // highlight matches in-cell
@@ -447,6 +548,14 @@ export function App(): JSX.Element {
               }
               setStagedImport(null);
             }}
+          />
+        )}
+
+        {schemaUnifierData && (
+          <SchemaUnifierModal
+            data={schemaUnifierData}
+            onConfirm={handleSchemaUnifierConfirm}
+            onCancel={handleSchemaUnifierCancel}
           />
         )}
       </div>
