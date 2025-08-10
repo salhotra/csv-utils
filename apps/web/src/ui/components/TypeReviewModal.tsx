@@ -18,7 +18,10 @@ export function TypeReviewModal({
 }: Props): JSX.Element {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onCancel} />
+      <div
+        className="absolute inset-0 bg-black/30 dark:bg-black/60"
+        onClick={onCancel}
+      />
       <div className="relative card p-6 w-[min(90vw,720px)] max-h-[85vh] overflow-auto">
         <h3 className="text-xl font-semibold mb-4">Review column types</h3>
         <div className="space-y-2">
@@ -39,7 +42,7 @@ export function TypeReviewModal({
           ))}
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <button className="chip hover:bg-white/20" onClick={onCancel}>
+          <button className="chip" onClick={onCancel}>
             Cancel
           </button>
           <button className="btn" onClick={onConfirm}>

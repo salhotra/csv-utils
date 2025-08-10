@@ -32,7 +32,7 @@ export function ColumnsFilter({
         Columns ({selectedColumns.length})
       </button>
       {columnsOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-panel rounded-xl border border-white/10 shadow-soft p-3 z-30">
+        <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-panel rounded-xl border border-slate-200 dark:border-white/10 p-3 z-30">
           <input
             className="input w-full mb-2"
             placeholder="Filter columns"
@@ -54,7 +54,9 @@ export function ColumnsFilter({
               );
             })}
             {filtered.length === 0 && (
-              <div className="text-white/50 text-sm">No columns</div>
+              <div className="text-slate-500 dark:text-white/50 text-sm">
+                No columns
+              </div>
             )}
           </div>
           <div className="mt-2 flex justify-between items-center">

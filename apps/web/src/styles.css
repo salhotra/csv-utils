@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
+}
+.dark {
   color-scheme: dark;
 }
 html,
@@ -11,29 +14,29 @@ body,
   height: 100%;
 }
 body {
-  @apply bg-surface text-white antialiased;
+  @apply bg-white text-slate-900 antialiased dark:bg-surface dark:text-white;
 }
 
 .btn {
-  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md bg-accent/80 hover:bg-accent text-white transition shadow-soft;
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-md bg-accent/80 hover:bg-accent text-white transition;
 }
 .input {
-  @apply bg-panel border border-white/10 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/50;
+  @apply bg-white border border-slate-200 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/50 dark:bg-panel dark:border-white/10;
 }
 .card {
-  @apply bg-panel/80 backdrop-blur rounded-xl border border-white/5 shadow-soft;
+  @apply bg-white backdrop-blur rounded-xl border border-slate-200 dark:bg-panel/80 dark:border-white/5;
 }
 .table {
   @apply w-full text-sm;
 }
 .th {
-  @apply text-left font-semibold border-b border-white/10 px-3 py-2;
+  @apply text-left font-semibold border-b border-slate-200 px-3 py-2 dark:border-white/10;
 }
 .td {
-  @apply border-b border-white/5 px-3 py-2;
+  @apply border-b border-slate-100 px-3 py-2 dark:border-white/5;
 }
 .chip {
-  @apply inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10;
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-full bg-black/10 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20;
 }
 
 /* Hide scrollbars but keep scroll functionality */

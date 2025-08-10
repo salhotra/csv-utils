@@ -11,6 +11,23 @@ import { useTypeProfiles } from "./hooks/useTypeProfiles";
 import { stampRow, inferColumnTypes, signatureOf } from "./utils/csv";
 
 export function App(): JSX.Element {
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem("theme");
+      return saved === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark");
+    else root.classList.remove("dark");
+    try {
+      localStorage.setItem("theme", theme);
+    } catch {}
+  }, [theme]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<UiRow[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -232,8 +249,12 @@ export function App(): JSX.Element {
   return (
     <div className="h-screen p-0 flex flex-col overflow-hidden">
       <div className="w-full space-y-4 flex-1 flex flex-col min-h-0 pb-4">
-        <div className="sticky top-0 z-20 bg-surface/80 backdrop-blur border-b border-white/5">
+        <div className="sticky top-0 z-20 bg-slate-50/80 dark:bg-surface/80 backdrop-blur border-b border-slate-200 dark:border-white/5">
           <Toolbar
+            theme={theme}
+            onToggleTheme={() =>
+              setTheme((t) => (t === "dark" ? "light" : "dark"))
+            }
             appendMode={appendMode}
             setAppendMode={setAppendMode}
             onUpload={onUpload}
@@ -248,7 +269,7 @@ export function App(): JSX.Element {
             }}
             canDelete={selectedRowIds.size > 0}
           />
-          <div className="px-6 pb-4">
+          <div className="pb-2">
             <SearchBar
               searchText={searchText}
               setSearchText={setSearchText}
@@ -293,7 +314,7 @@ export function App(): JSX.Element {
         />
 
         {warnings.length > 0 && (
-          <section className="card p-4 text-amber-300">
+          <section className="card p-4 text-amber-700 dark:text-amber-300">
             <ul className="list-disc pl-5 space-y-1">
               {warnings.map((w, i) => (
                 <li key={i}>{w}</li>

@@ -30,7 +30,7 @@ export function DataTable({
         <div className="p-6 text-white/60">Upload CSV files to begin.</div>
       ) : (
         <table className="table w-full">
-          <thead className="sticky top-0 bg-panel z-10">
+          <thead className="sticky top-0 bg-slate-50 dark:bg-panel z-10">
             <tr className="bg-white/5">
               <th className="th w-10">
                 <input
@@ -60,7 +60,7 @@ export function DataTable({
           </thead>
           <tbody>
             {filteredRows.map((r, idx) => (
-              <tr key={idx} className="hover:bg-white/5">
+              <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5">
                 <td className="td">
                   <input
                     type="checkbox"
@@ -87,7 +87,7 @@ export function DataTable({
               </td>
             </tr>
           </tbody>
-          <tfoot className="sticky bottom-0 bg-panel z-10">
+          <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-panel z-10">
             <tr className="bg-white/5">
               <td className="td font-semibold">Totals</td>
               {headers.map((h) => (

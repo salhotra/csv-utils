@@ -1,6 +1,8 @@
 import React from "react";
 
 type Props = {
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
   appendMode: "append" | "replace";
   setAppendMode: (v: "append" | "replace") => void;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 export function Toolbar({
+  theme,
+  onToggleTheme,
   appendMode,
   setAppendMode,
   onUpload,
@@ -23,6 +27,23 @@ export function Toolbar({
     <div className="px-6 py-4 flex items-center justify-between">
       <h1 className="text-2xl font-semibold tracking-tight">csv-utils</h1>
       <div className="flex items-center gap-3">
+        <button
+          className="chip"
+          aria-label="Toggle theme"
+          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+          onClick={onToggleTheme}
+        >
+          {/* Half-moon icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-5 w-5"
+          >
+            <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
+          </svg>
+          <span className="text-sm">{theme === "dark" ? "Dark" : "Light"}</span>
+        </button>
         <select
           className="input"
           value={appendMode}
