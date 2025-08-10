@@ -22,6 +22,7 @@ import {
   type UploadedFile,
 } from "./store";
 import { FileSidebar } from "./components/FileSidebar";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 export function App(): JSX.Element {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -485,39 +486,467 @@ export function App(): JSX.Element {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="h-screen p-0 flex flex-col overflow-hidden">
-      <div className="w-full space-y-4 flex-1 flex flex-col min-h-0 pb-4">
-        <div className="sticky top-0 z-20 bg-slate-50/80 dark:bg-surface/80 backdrop-blur border-b border-slate-200 dark:border-white/5">
-          <Toolbar
-            theme={theme}
-            onToggleTheme={() =>
-              setTheme((t) => (t === "dark" ? "light" : "dark"))
-            }
-            appendMode={appendMode}
-            setAppendMode={setAppendModeInStore}
-            onUpload={onUpload}
-            onDownload={downloadCsv}
-            canDownload={headers.length > 0}
-            onDeleteSelected={() => {
-              if (selectedRowIds.size === 0) return;
-              removeRowsByIds(selectedRowIds);
-              setSelectedRowIds(new Set());
-            }}
-            canDelete={selectedRowIds.size > 0}
-            onEditColumns={handleEditColumns}
-            canEdit={headers.length > 0}
-          />
-          <div className="pb-2">
-            <SearchBar
-              searchText={searchText}
-              setSearchText={setSearchText}
-              rowSummary={
-                searchText
-                  ? `Showing ${filteredCount} of ${totalRows} rows`
-                  : `${totalRows} rows`
+  // Show empty state when no data is loaded
+  if (headers.length === 0) {
+    return (
+      <div className="h-screen bg-gradient-to-br from-slate-50 to-white dark:from-surface dark:to-panel">
+        {/* Header */}
+        <header className="border-b border-slate-200/60 dark:border-white/5 bg-white/80 dark:bg-surface/80 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
+              <h1 className="text-xl font-semibold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                csv-utils
+              </h1>
+            </div>
+            <ThemeToggle
+              theme={theme}
+              onToggle={() =>
+                setTheme((t) => (t === "dark" ? "light" : "dark"))
               }
-              rightSide={
+            />
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <main className="flex-1 flex items-center justify-center px-6">
+          <div className="max-w-2xl text-center space-y-8">
+            {/* Icon */}
+            <div className="flex justify-center">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent/20 to-purple-600/20 dark:from-accent/30 dark:to-purple-600/30 flex items-center justify-center">
+                <svg
+                  className="w-10 h-10 text-accent"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Heading */}
+            <div className="space-y-4">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
+                Transform Your CSV Data
+              </h2>
+              <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+                Upload, analyze, and manipulate CSV files with powerful tools.
+                Search, filter, edit columns, and export your data effortlessly.
+              </p>
+            </div>
+
+            {/* Upload Action */}
+            <div className="space-y-6">
+              <label className="group relative cursor-pointer">
+                <div className="flex flex-col items-center gap-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/20 rounded-2xl hover:border-accent dark:hover:border-accent transition-all duration-300 hover:bg-accent/5 dark:hover:bg-accent/10">
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 dark:bg-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <svg
+                      className="w-6 h-6 text-accent"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-lg font-semibold text-slate-900 dark:text-white">
+                      Drop CSV files here or click to browse
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      Supports multiple files • Automatic schema detection
+                    </div>
+                  </div>
+                </div>
+                <input
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  type="file"
+                  accept=".csv"
+                  multiple
+                  onChange={onUpload}
+                />
+              </label>
+
+              {/* Mode Selection */}
+              <div className="flex items-center justify-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    checked={appendMode === "replace"}
+                    onChange={() => setAppendModeInStore("replace")}
+                    className="text-accent focus:ring-accent"
+                  />
+                  Replace existing data
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    checked={appendMode === "append"}
+                    onChange={() => setAppendModeInStore("append")}
+                    className="text-accent focus:ring-accent"
+                  />
+                  Append to existing
+                </label>
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="grid grid-cols-3 gap-6 pt-8">
+              <div className="text-center space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto">
+                  <svg
+                    className="w-4 h-4 text-emerald-600 dark:text-emerald-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-white">
+                  Search & Filter
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Find data instantly
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto">
+                  <svg
+                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-white">
+                  Edit Columns
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Rename and reorder
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto">
+                  <svg
+                    className="w-4 h-4 text-purple-600 dark:text-purple-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <div className="text-sm font-medium text-slate-900 dark:text-white">
+                  Export Data
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Download filtered results
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Error Modal */}
+        {errorModal && (
+          <ErrorModal
+            title={errorModal.title}
+            message={errorModal.message}
+            onClose={() => setErrorModal(null)}
+          />
+        )}
+
+        {/* Type Review Modal */}
+        {stagedImport && (
+          <TypeReviewModal
+            headers={stagedImport.headers}
+            types={stagedImport.types}
+            onChangeType={(h, t) =>
+              setStagedImport((prev) =>
+                prev ? { ...prev, types: { ...prev.types, [h]: t } } : prev
+              )
+            }
+            onCancel={() => setStagedImport(null)}
+            onConfirm={() => {
+              if (!stagedImport) return;
+              const sig = signatureOf(stagedImport.headers);
+              if (appendMode === "replace" || headers.length === 0) {
+                replaceDataInStore({
+                  headers: stagedImport.headers,
+                  rows: stagedImport.rows,
+                  uploadedFiles: stagedImport.uploadedFiles ?? [],
+                });
+                setSelectedColumns([...stagedImport.headers]);
+                addWarningsToStore(stagedImport.warnings);
+                setColumnTypes(stagedImport.types);
+                setTypeProfiles((prev) => ({
+                  ...prev,
+                  [sig]: stagedImport.types,
+                }));
+              } else {
+                appendDataInStore({
+                  rows: stagedImport.rows,
+                  uploadedFiles: stagedImport.uploadedFiles ?? [],
+                });
+                addWarningsToStore(stagedImport.warnings);
+                setColumnTypes((prev) => ({ ...prev, ...stagedImport.types }));
+                setTypeProfiles((prev) => ({
+                  ...prev,
+                  [sig]: { ...(prev[sig] ?? {}), ...stagedImport.types },
+                }));
+              }
+              setStagedImport(null);
+            }}
+          />
+        )}
+
+        {/* Schema Unifier Modal */}
+        {schemaUnifierData && (
+          <SchemaUnifierModal
+            data={schemaUnifierData}
+            onConfirm={handleSchemaUnifierConfirm}
+            onCancel={handleSchemaUnifierCancel}
+          />
+        )}
+
+        {/* Column Editor Modal */}
+        {columnEditorOpen && (
+          <ColumnEditorModal
+            headers={headers}
+            columnTypes={columnTypes}
+            onConfirm={handleColumnEditorConfirm}
+            onCancel={handleColumnEditorCancel}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen bg-slate-50 dark:bg-surface flex flex-col">
+      <div className="w-full space-y-4 flex-1 flex flex-col min-h-0 pb-4">
+        {/* Modern Header */}
+        <header className="border-b border-slate-200/60 dark:border-white/5 bg-white/80 dark:bg-surface/80 backdrop-blur-xl sticky top-0 z-20">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
+                  <svg
+                    className="w-5 h-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <h1 className="text-xl font-semibold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                  csv-utils
+                </h1>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                <ThemeToggle
+                  theme={theme}
+                  onToggle={() =>
+                    setTheme((t) => (t === "dark" ? "light" : "dark"))
+                  }
+                />
+
+                <div className="h-6 w-px bg-slate-300 dark:bg-white/20"></div>
+
+                <label className="btn cursor-pointer">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  Upload
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept=".csv"
+                    multiple
+                    onChange={onUpload}
+                  />
+                </label>
+
+                <button
+                  className="btn secondary"
+                  onClick={downloadCsv}
+                  disabled={headers.length === 0}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Export
+                </button>
+
+                <div className="h-6 w-px bg-slate-300 dark:bg-white/20"></div>
+
+                <button
+                  className="btn secondary"
+                  onClick={handleEditColumns}
+                  disabled={headers.length === 0}
+                  title="Edit column names, types, and order"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                  Edit
+                </button>
+
+                <button
+                  className="btn destructive"
+                  onClick={() => {
+                    if (selectedRowIds.size === 0) return;
+                    removeRowsByIds(selectedRowIds);
+                    setSelectedRowIds(new Set());
+                  }}
+                  disabled={selectedRowIds.size === 0}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  Delete ({selectedRowIds.size})
+                </button>
+              </div>
+            </div>
+
+            {/* Search and Controls */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 flex items-center gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <svg
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-panel border border-slate-200 dark:border-white/10 rounded-lg text-sm focus:ring-2 focus:ring-accent/50 focus:border-accent outline-none"
+                    placeholder="Search across columns..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                  />
+                  {searchText && (
+                    <button
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                      onClick={() => setSearchText("")}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
                 <ColumnsFilter
                   headers={headers}
                   selectedColumns={selectedColumns}
@@ -535,12 +964,31 @@ export function App(): JSX.Element {
                   totalRows={totalRows}
                   filteredCount={filteredCount}
                 />
-              }
-            />
-          </div>
-        </div>
+              </div>
 
-        <div className="flex gap-4 px-6 flex-1 min-h-0">
+              <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+                <select
+                  className="px-3 py-1.5 text-xs bg-white dark:bg-panel border border-slate-200 dark:border-white/10 rounded-md"
+                  value={appendMode}
+                  onChange={(e) =>
+                    setAppendModeInStore(e.target.value as "append" | "replace")
+                  }
+                >
+                  <option value="replace">Replace mode</option>
+                  <option value="append">Append mode</option>
+                </select>
+                <div className="text-sm font-medium">
+                  {searchText
+                    ? `${filteredCount.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+                    : `${totalRows.toLocaleString()} rows`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <div className="flex-1 flex gap-6 p-6 min-h-0">
           <DataTable
             headers={headers}
             rows={rows}
@@ -555,14 +1003,37 @@ export function App(): JSX.Element {
           <FileSidebar />
         </div>
 
+        {/* Warnings */}
         {warnings.length > 0 && (
-          <section className="card p-4 text-amber-700 dark:text-amber-300">
-            <ul className="list-disc pl-5 space-y-1">
-              {warnings.map((w: string, i: number) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          </section>
+          <div className="px-6 pb-6">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-amber-500 mt-0.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="font-medium text-amber-900 dark:text-amber-200 mb-2">
+                    Import Warnings
+                  </h3>
+                  <ul className="space-y-1 text-sm text-amber-800 dark:text-amber-300">
+                    {warnings.map((w: string, i: number) => (
+                      <li key={i}>• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {errorModal && (
