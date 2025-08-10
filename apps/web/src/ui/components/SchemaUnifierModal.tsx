@@ -132,6 +132,9 @@ export function SchemaUnifierModal({
     return [...orderedExisting, ...unusedExisting, ...newColumns];
   }, [mappings, data.existingHeaders]);
 
+  // Store original calculated order for reset functionality
+  const [originalCalculatedOrder] = useState(() => calculatedFinalColumnOrder);
+
   // Update finalColumnOrder when mappings change
   useEffect(() => {
     setFinalColumnOrder(calculatedFinalColumnOrder);
@@ -429,6 +432,7 @@ export function SchemaUnifierModal({
                 columnTypes={finalColumnTypes}
                 onReorder={handleColumnReorder}
                 onTypeChange={handleTypeChange}
+                originalOrder={originalCalculatedOrder}
               />
             </div>
           </div>
