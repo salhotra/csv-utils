@@ -1,7 +1,14 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { parseCsvFile } from "@csv-utils/io-browser";
-
-type UiRow = Record<string, string> & { _rid: string };
+import type { UiRow, ColumnType } from "./types";
+import { DataTable } from "./components/DataTable";
+import { Toolbar } from "./components/Toolbar";
+import { SearchBar } from "./components/SearchBar";
+import { ColumnsFilter } from "./components/ColumnsFilter";
+import { ErrorModal } from "./components/ErrorModal";
+import { TypeReviewModal } from "./components/TypeReviewModal";
+import { useTypeProfiles } from "./hooks/useTypeProfiles";
+import { stampRow, inferColumnTypes, signatureOf } from "./utils/csv";
 
 export function App(): JSX.Element {
   const [headers, setHeaders] = useState<string[]>([]);
@@ -17,6 +24,19 @@ export function App(): JSX.Element {
     title: string;
     message: string;
   } | null>(null);
+  const [columnTypes, setColumnTypes] = useState<Record<string, ColumnType>>(
+    {}
+  );
+  const { profiles: typeProfiles, setProfiles: setTypeProfiles } =
+    useTypeProfiles();
+  const [stagedImport, setStagedImport] = useState<{
+    headers: string[];
+    rows: UiRow[];
+    warnings: string[];
+    types: Record<string, ColumnType>;
+  } | null>(null);
+
+  // no-op here; persistence handled by hook
 
   const filteredRows = useMemo(() => {
     if (!searchText.trim() || selectedColumns.length === 0) return rows;
@@ -26,14 +46,7 @@ export function App(): JSX.Element {
     );
   }, [rows, searchText, selectedColumns]);
 
-  const stampRow = (row: Record<string, string>): UiRow => {
-    const existing = (row as Partial<UiRow>)._rid;
-    if (existing) return row as UiRow;
-    const id = (globalThis as any).crypto?.randomUUID
-      ? (globalThis as any).crypto.randomUUID()
-      : `r_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    return { ...(row as Record<string, string>), _rid: id };
-  };
+  // utilities are imported from ./utils/csv
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -88,10 +101,25 @@ export function App(): JSX.Element {
         });
         return;
       }
-      setHeaders(h);
-      setRows(valid.flatMap((p) => p.rows.map(stampRow)));
-      setSelectedColumns(h);
-      setWarnings((w) => [...w, ...newWarnings]);
+      const nextRows: UiRow[] = valid.flatMap((p) => p.rows.map(stampRow));
+      const sig = signatureOf(h);
+      const known = typeProfiles[sig];
+      if (known) {
+        // Known schema: skip type review
+        setHeaders(h);
+        setRows(nextRows);
+        setSelectedColumns(h);
+        setWarnings((w) => [...w, ...newWarnings]);
+        setColumnTypes(known);
+      } else {
+        const inferred = inferColumnTypes(h, nextRows);
+        setStagedImport({
+          headers: h,
+          rows: nextRows,
+          warnings: newWarnings,
+          types: inferred,
+        });
+      }
       return;
     }
 
@@ -118,10 +146,11 @@ export function App(): JSX.Element {
       });
       return;
     }
-    setRows((r) => [
-      ...r,
-      ...valid.flatMap((p: Parsed) => p.rows.map(stampRow)),
-    ]);
+    const nextRows: UiRow[] = valid.flatMap((p: Parsed) =>
+      p.rows.map(stampRow)
+    );
+    // Columns match existing -> skip review and append directly
+    setRows((r) => [...r, ...nextRows]);
     setWarnings((w) => [...w, ...newWarnings]);
   };
 
@@ -152,13 +181,26 @@ export function App(): JSX.Element {
     return out;
   };
 
-  const filteredHeaders = useMemo(() => {
-    const q = columnQuery.toLowerCase();
-    return headers.filter((h) => h.toLowerCase().includes(q));
-  }, [headers, columnQuery]);
-
   const totalRows = rows.length;
   const filteredCount = filteredRows.length;
+
+  const numberFormatter = useMemo(() => new Intl.NumberFormat("en-US"), []);
+  const totalsByColumn = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const h of headers) {
+      if (columnTypes[h] !== "number") continue;
+      let sum = 0;
+      for (const r of filteredRows) {
+        const v = r[h];
+        if (v === undefined || v === null) continue;
+        const normalized = String(v).trim().replace(/,/g, "");
+        const num = Number(normalized);
+        if (Number.isFinite(num)) sum += num;
+      }
+      totals[h] = sum;
+    }
+    return totals;
+  }, [headers, filteredRows, columnTypes]);
 
   const downloadCsv = (): void => {
     if (headers.length === 0) return;
@@ -191,209 +233,64 @@ export function App(): JSX.Element {
     <div className="min-h-screen p-0 flex flex-col">
       <div className="w-full space-y-4 flex-1 flex flex-col min-h-0">
         <div className="sticky top-0 z-20 bg-surface/80 backdrop-blur border-b border-white/5">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-semibold tracking-tight">csv-utils</h1>
-            <div className="flex items-center gap-3">
-              <select
-                className="input"
-                value={appendMode}
-                onChange={(e) =>
-                  setAppendMode(e.target.value as "append" | "replace")
-                }
-              >
-                <option value="replace">Replace on upload</option>
-                <option value="append">Append on upload</option>
-              </select>
-              <label className="btn cursor-pointer">
-                Upload CSV
-                <input
-                  className="hidden"
-                  type="file"
-                  accept=".csv"
-                  multiple
-                  onChange={onUpload}
-                />
-              </label>
-              <button
-                className="btn"
-                onClick={downloadCsv}
-                disabled={headers.length === 0}
-              >
-                Download CSV
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  if (selectedRowIds.size === 0) return;
-                  setRows((prev) =>
-                    prev.filter((r) => !selectedRowIds.has(r._rid))
-                  );
-                  setSelectedRowIds(new Set());
-                }}
-                disabled={selectedRowIds.size === 0}
-              >
-                Delete selected
-              </button>
-            </div>
-          </div>
+          <Toolbar
+            appendMode={appendMode}
+            setAppendMode={setAppendMode}
+            onUpload={onUpload}
+            onDownload={downloadCsv}
+            canDownload={headers.length > 0}
+            onDeleteSelected={() => {
+              if (selectedRowIds.size === 0) return;
+              setRows((prev) =>
+                prev.filter((r) => !selectedRowIds.has(r._rid))
+              );
+              setSelectedRowIds(new Set());
+            }}
+            canDelete={selectedRowIds.size > 0}
+          />
           <div className="px-6 pb-4">
-            <div className="card p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  className="input flex-1 min-w-[240px]"
-                  placeholder="Search text"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
+            <SearchBar
+              searchText={searchText}
+              setSearchText={setSearchText}
+              rowSummary={
+                searchText
+                  ? `Showing ${filteredCount} of ${totalRows} rows`
+                  : `${totalRows} rows`
+              }
+              rightSide={
+                <ColumnsFilter
+                  headers={headers}
+                  selectedColumns={selectedColumns}
+                  columnsOpen={columnsOpen}
+                  setColumnsOpen={setColumnsOpen}
+                  columnQuery={columnQuery}
+                  setColumnQuery={setColumnQuery}
+                  onToggleColumn={(h, checked) =>
+                    setSelectedColumns((cols) =>
+                      checked
+                        ? Array.from(new Set([...cols, h]))
+                        : cols.filter((c) => c !== h)
+                    )
+                  }
+                  totalRows={totalRows}
+                  filteredCount={filteredCount}
                 />
-                {searchText && (
-                  <button
-                    className="chip hover:bg-white/20"
-                    onClick={() => setSearchText("")}
-                  >
-                    Clear
-                  </button>
-                )}
-                <div className="relative">
-                  <button
-                    className="btn"
-                    onClick={() => setColumnsOpen((o) => !o)}
-                  >
-                    Columns ({selectedColumns.length})
-                  </button>
-                  {columnsOpen && (
-                    <div className="absolute right-0 mt-2 w-72 bg-panel rounded-xl border border-white/10 shadow-soft p-3 z-30">
-                      <input
-                        className="input w-full mb-2"
-                        placeholder="Filter columns"
-                        value={columnQuery}
-                        onChange={(e) => setColumnQuery(e.target.value)}
-                      />
-                      <div className="max-h-60 overflow-auto space-y-1">
-                        {filteredHeaders.map((h) => {
-                          const checked = selectedColumns.includes(h);
-                          return (
-                            <label key={h} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) =>
-                                  setSelectedColumns((cols) =>
-                                    e.target.checked
-                                      ? [...cols, h]
-                                      : cols.filter((c) => c !== h)
-                                  )
-                                }
-                              />
-                              <span>{h}</span>
-                            </label>
-                          );
-                        })}
-                        {filteredHeaders.length === 0 && (
-                          <div className="text-white/50 text-sm">
-                            No columns
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-2 flex justify-between items-center">
-                        <div className="text-xs text-white/50">
-                          {searchText
-                            ? `${filteredCount} of ${totalRows} rows`
-                            : `${totalRows} rows`}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            className="chip hover:bg-white/20"
-                            onClick={() => setSelectedColumns(headers)}
-                          >
-                            Select all
-                          </button>
-                          <button
-                            className="chip hover:bg-white/20"
-                            onClick={() => setSelectedColumns([])}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="text-sm text-white/60 ml-auto">
-                  {searchText ? (
-                    <span>
-                      Showing {filteredCount} of {totalRows} rows
-                    </span>
-                  ) : (
-                    <span>{totalRows} rows</span>
-                  )}
-                </div>
-              </div>
-            </div>
+              }
+            />
           </div>
         </div>
 
-        <section className="card p-0 flex-1 overflow-auto mx-6 mt-4">
-          {headers.length === 0 ? (
-            <div className="p-6 text-white/60">Upload CSV files to begin.</div>
-          ) : (
-            <table className="table w-full">
-              <thead className="sticky top-0 bg-panel">
-                <tr>
-                  <th className="th w-10">
-                    <input
-                      type="checkbox"
-                      aria-label="Select visible"
-                      checked={
-                        filteredRows.length > 0 &&
-                        filteredRows.every((r) => selectedRowIds.has(r._rid))
-                      }
-                      onChange={(e) => {
-                        const allVisible = new Set(selectedRowIds);
-                        if (e.target.checked) {
-                          for (const r of filteredRows) allVisible.add(r._rid);
-                        } else {
-                          for (const r of filteredRows)
-                            allVisible.delete(r._rid);
-                        }
-                        setSelectedRowIds(allVisible);
-                      }}
-                    />
-                  </th>
-                  {headers.map((h) => (
-                    <th key={h} className="th">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-white/5">
-                    <td className="td">
-                      <input
-                        type="checkbox"
-                        checked={selectedRowIds.has(r._rid)}
-                        onChange={(e) => {
-                          setSelectedRowIds((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(r._rid);
-                            else next.delete(r._rid);
-                            return next;
-                          });
-                        }}
-                      />
-                    </td>
-                    {headers.map((h) => (
-                      <td key={h} className="td">
-                        {highlight(String(r[h] ?? ""), h)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
+        <DataTable
+          headers={headers}
+          rows={rows}
+          filteredRows={filteredRows}
+          selectedRowIds={selectedRowIds}
+          setSelectedRowIds={setSelectedRowIds}
+          highlight={(text, col) => highlight(text, col)}
+          columnTypes={columnTypes}
+          totalsByColumn={totalsByColumn}
+          numberFormatter={numberFormatter}
+        />
 
         {warnings.length > 0 && (
           <section className="card p-4 text-amber-300">
@@ -406,23 +303,48 @@ export function App(): JSX.Element {
         )}
 
         {errorModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div
-              className="absolute inset-0 bg-black/60"
-              onClick={() => setErrorModal(null)}
-            />
-            <div className="relative card p-6 w-[min(90vw,640px)]">
-              <h3 className="text-xl font-semibold mb-2">{errorModal.title}</h3>
-              <pre className="bg-black/30 p-3 rounded-md text-white/80 text-sm whitespace-pre-wrap">
-                {errorModal.message}
-              </pre>
-              <div className="mt-4 flex justify-end">
-                <button className="btn" onClick={() => setErrorModal(null)}>
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+          <ErrorModal
+            title={errorModal.title}
+            message={errorModal.message}
+            onClose={() => setErrorModal(null)}
+          />
+        )}
+
+        {stagedImport && (
+          <TypeReviewModal
+            headers={stagedImport.headers}
+            types={stagedImport.types}
+            onChangeType={(h, t) =>
+              setStagedImport((prev) =>
+                prev ? { ...prev, types: { ...prev.types, [h]: t } } : prev
+              )
+            }
+            onCancel={() => setStagedImport(null)}
+            onConfirm={() => {
+              if (!stagedImport) return;
+              const sig = signatureOf(stagedImport.headers);
+              if (appendMode === "replace" || headers.length === 0) {
+                setHeaders(stagedImport.headers);
+                setRows(stagedImport.rows);
+                setSelectedColumns(stagedImport.headers);
+                setWarnings((w) => [...w, ...stagedImport.warnings]);
+                setColumnTypes(stagedImport.types);
+                setTypeProfiles((prev) => ({
+                  ...prev,
+                  [sig]: stagedImport.types,
+                }));
+              } else {
+                setRows((r) => [...r, ...stagedImport.rows]);
+                setWarnings((w) => [...w, ...stagedImport.warnings]);
+                setColumnTypes((prev) => ({ ...prev, ...stagedImport.types }));
+                setTypeProfiles((prev) => ({
+                  ...prev,
+                  [sig]: { ...(prev[sig] ?? {}), ...stagedImport.types },
+                }));
+              }
+              setStagedImport(null);
+            }}
+          />
         )}
       </div>
     </div>
