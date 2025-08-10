@@ -10,6 +10,8 @@ type Props = {
   canDownload: boolean;
   onDeleteSelected: () => void;
   canDelete: boolean;
+  onEditColumns: () => void;
+  canEdit: boolean;
 };
 
 export function Toolbar({
@@ -22,6 +24,8 @@ export function Toolbar({
   canDownload,
   onDeleteSelected,
   canDelete,
+  onEditColumns,
+  canEdit,
 }: Props): JSX.Element {
   return (
     <div className="px-6 py-4 flex items-center justify-between">
@@ -66,6 +70,23 @@ export function Toolbar({
         </label>
         <button className="btn" onClick={onDownload} disabled={!canDownload}>
           Download CSV
+        </button>
+        <button
+          className="btn"
+          onClick={onEditColumns}
+          disabled={!canEdit}
+          title="Edit column names, types, and order"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="mr-2"
+          >
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+          Edit Columns
         </button>
         <button
           className="btn"

@@ -9,6 +9,7 @@ import { ColumnsFilter } from "./components/ColumnsFilter";
 import { ErrorModal } from "./components/ErrorModal";
 import { TypeReviewModal } from "./components/TypeReviewModal";
 import { SchemaUnifierModal } from "./components/SchemaUnifierModal";
+import { ColumnEditorModal } from "./components/ColumnEditorModal";
 import { useTypeProfiles } from "./hooks/useTypeProfiles";
 import { stampRow, inferColumnTypes, signatureOf } from "./utils/csv";
 import {
@@ -68,6 +69,7 @@ export function App(): JSX.Element {
   } | null>(null);
   const [schemaUnifierData, setSchemaUnifierData] =
     useState<SchemaUnifierData | null>(null);
+  const [columnEditorOpen, setColumnEditorOpen] = useState(false);
 
   // no-op here; persistence handled by hook
 
@@ -347,6 +349,67 @@ export function App(): JSX.Element {
     setSchemaUnifierData(null);
   };
 
+  // Column editor handlers
+  const handleEditColumns = () => {
+    setColumnEditorOpen(true);
+  };
+
+  const handleColumnEditorConfirm = ({
+    newHeaders,
+    newColumnTypes,
+    columnRenames,
+  }: {
+    newHeaders: string[];
+    newColumnTypes: Record<string, ColumnType>;
+    columnRenames: Record<string, string>;
+  }) => {
+    setColumnEditorOpen(false);
+
+    // Update rows with renamed columns
+    const updatedRows = rows.map((row) => {
+      const newRow: Record<string, string> = { _rid: row._rid };
+
+      // Copy data with new column names
+      newHeaders.forEach((newHeader) => {
+        // Find the original header name
+        const originalHeader =
+          Object.entries(columnRenames).find(
+            ([_, newName]) => newName === newHeader
+          )?.[0] || newHeader;
+
+        newRow[newHeader] = row[originalHeader] || "";
+      });
+
+      return newRow as UiRow;
+    });
+
+    // Update uploaded files metadata
+    const updatedUploadedFiles = store.uploadedFiles.map((file) => ({
+      ...file,
+      headers: newHeaders,
+      schemaSignature: signatureOf(newHeaders),
+    }));
+
+    // Update store
+    replaceDataInStore({
+      headers: newHeaders,
+      rows: updatedRows,
+      uploadedFiles: updatedUploadedFiles,
+    });
+
+    // Update other state
+    setSelectedColumns(newHeaders);
+    setColumnTypes(newColumnTypes);
+
+    // Update type profiles with new signature
+    const newSignature = signatureOf(newHeaders);
+    setTypeProfiles((prev) => ({ ...prev, [newSignature]: newColumnTypes }));
+  };
+
+  const handleColumnEditorCancel = () => {
+    setColumnEditorOpen(false);
+  };
+
   // highlight matches in-cell
   const escReg = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const highlight = (text: string, col: string): React.ReactNode => {
@@ -442,6 +505,8 @@ export function App(): JSX.Element {
               setSelectedRowIds(new Set());
             }}
             canDelete={selectedRowIds.size > 0}
+            onEditColumns={handleEditColumns}
+            canEdit={headers.length > 0}
           />
           <div className="pb-2">
             <SearchBar
@@ -556,6 +621,15 @@ export function App(): JSX.Element {
             data={schemaUnifierData}
             onConfirm={handleSchemaUnifierConfirm}
             onCancel={handleSchemaUnifierCancel}
+          />
+        )}
+
+        {columnEditorOpen && (
+          <ColumnEditorModal
+            headers={headers}
+            columnTypes={columnTypes}
+            onConfirm={handleColumnEditorConfirm}
+            onCancel={handleColumnEditorCancel}
           />
         )}
       </div>
